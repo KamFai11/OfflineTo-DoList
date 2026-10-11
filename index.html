@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>今日清单 · 离线待办</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: #f4f6f3; color: #24382d; font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
+    main { width: min(100% - 32px, 620px); margin: 72px auto; }
+    .eyebrow { color: #587763; font-size: 12px; font-weight: 700; letter-spacing: 3px; }
+    header { position: relative; padding: 0 4px; }
+    .eyebrow { display: flex; align-items: center; gap: 8px; letter-spacing: 2px; }
+    .eyebrow::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #77a382; box-shadow: 0 0 0 4px #77a38212; }
+    h1 { display: flex; align-items: center; gap: 14px; margin: 18px 0 14px; font-size: clamp(30px, 6vw, 40px); font-weight: 650; line-height: 1.3; letter-spacing: 1px; color: #244c38; }
+    .title-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 50px; height: 50px; border: 1px solid #d5e4d8; border-radius: 16px; background: linear-gradient(145deg, #f8fcf7, #e3efe3); box-shadow: 0 5px 12px #3266470a, inset 0 1px 0 #fff; transform: rotate(-5deg); }
+    .title-icon svg { width: 29px; height: 29px; }
+    .title-text { position: relative; isolation: isolate; }
+    .title-text::after { content: ''; position: absolute; z-index: -1; left: 1px; right: -3px; bottom: 2px; height: 10px; border-radius: 6px; background: #deead6; transform: rotate(-1.5deg); }
+    .intro { color: #68766d; margin: 0 0 28px; line-height: 1.7; }
+    .card { padding: 24px; border: 1px solid #e0e7df; border-radius: 22px; background: #fff; box-shadow: 0 12px 40px #23382d08; }
+    label[for="task-input"] { display: block; margin-bottom: 10px; font-size: 14px; font-weight: 600; }
+    .input-row { display: flex; gap: 10px; }
+    input[type="text"] { min-width: 0; flex: 1; border: 1px solid #cdd8cf; border-radius: 10px; padding: 13px 14px; font: inherit; background: #fafcf9; color: inherit; }
+    button { min-height: 44px; border: 0; border-radius: 10px; padding: 10px 18px; font: inherit; cursor: pointer; }
+    .add { flex-shrink: 0; background: #326647; color: white; font-weight: 600; }
+    .add:hover { background: #264f37; }
+    :focus-visible { outline: 3px solid #87b79a; outline-offset: 3px; }
+    .summary { display: flex; align-items: center; justify-content: space-between; margin-top: 26px; padding-bottom: 14px; border-bottom: 1px solid #edf0ec; font-size: 14px; }
+    .summary strong { color: #326647; }
+    .hint { color: #829086; font-size: 12px; }
+    .filters { display: flex; gap: 8px; margin-top: 16px; }
+    .filter { flex: 1; padding: 10px 8px; background: #f4f6f3; color: #587763; font-size: 14px; }
+    .filter[aria-pressed="true"] { background: #326647; color: #fff; font-weight: 600; }
+    ul { list-style: none; margin: 0; padding: 0; }
+    .task { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid #edf0ec; }
+    .task:last-child { border-bottom: 0; }
+    .task label { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; min-height: 44px; cursor: pointer; }
+    .task input { flex-shrink: 0; width: 21px; height: 21px; margin: 0; accent-color: #326647; cursor: pointer; }
+    .task span { line-height: 1.6; overflow-wrap: anywhere; }
+    .task.done span { color: #8b958e; text-decoration: line-through; }
+    .delete { flex-shrink: 0; padding: 8px 12px; background: transparent; color: #8a6862; font-size: 13px; }
+    .delete:hover { background: #fcf1ef; color: #a33e30; }
+    .tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    .tools button, .edit { background: #f4f6f3; color: #587763; font-size: 13px; padding: 8px 12px; }
+    .undo { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; font-size: 14px; }
+    .undo button { background: #e8f2eb; color: #326647; }
+    dialog { width: min(100% - 32px, 460px); border: 1px solid #e0e7df; border-radius: 18px; padding: 24px; color: #24382d; }
+    dialog::backdrop { background: #16271e66; }
+    dialog h2 { margin-top: 0; font-size: 21px; }
+    dialog input { width: 100%; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+    @media (max-width: 480px) { .task { gap: 6px; } .task label { gap: 8px; } .edit, .delete { padding-inline: 8px; } }
+    .empty { text-align: center; padding: 38px 10px 24px; color: #829086; line-height: 1.8; }
+    .empty b { display: block; font-size: 16px; font-weight: 500; color: #526b5b; }
+    .message { margin: 12px 0 0; color: #a34430; font-size: 13px; line-height: 1.6; }
+    [hidden] { display: none !important; }
+    footer { text-align: center; margin-top: 22px; color: #829086; font-size: 12px; line-height: 1.8; }
+    @media (max-width: 480px) { main { margin: 36px auto; } .card { padding: 18px; } .add { padding-inline: 14px; } .hint { display: none; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow">给生活一点条理</div>
+      <h1><span class="title-icon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="22" height="25" rx="5"/><path d="m10 12 2 2 4-4M19 12h3m-12 9 2 2 4-4m3 2h3"/></svg></span><span class="title-text">今日清单</span></h1>
+      <p class="intro">记下要做的小事，一件一件慢慢完成。</p>
+    </header>
+    <section class="card" aria-label="待办清单">
+      <form id="task-form">
+        <label for="task-input">接下来想做什么？</label>
+        <div class="input-row">
+          <input id="task-input" type="text" placeholder="例如：读书 20 分钟" maxlength="500" autocomplete="off" required>
+          <button class="add" type="submit">添加</button>
+        </div>
+      </form>
+      <p id="message" class="message" role="alert" hidden></p>
+      <div class="summary">
+        <span id="count" role="status" aria-live="polite"></span>
+        <span class="hint">小小行动，也算进步</span>
+      </div>
+      <div class="filters" role="group" aria-label="筛选任务">
+        <button class="filter" type="button" data-filter="all" aria-pressed="true">全部</button>
+        <button class="filter" type="button" data-filter="active" aria-pressed="false">未完成</button>
+        <button class="filter" type="button" data-filter="completed" aria-pressed="false">已完成</button>
+      </div>
+      <ul id="task-list" aria-label="任务"></ul>
+      <div id="empty" class="empty"><b>清单还是空的</b>添加第一件事，从这里开始。</div>
+      <div id="undo-bar" class="undo" hidden>
+        <span id="undo-text" role="status"></span>
+        <button id="undo-button" type="button">撤销删除</button>
+      </div>
+      <div class="tools" aria-label="数据备份">
+        <button id="export-button" type="button">导出备份</button>
+        <button id="import-button" type="button">导入备份</button>
+        <input id="import-file" type="file" accept=".json,application/json" hidden>
+      </div>
+      <p class="hint">导入会追加任务，并跳过内容与完成状态都相同的任务。</p>
+      <p id="backup-status" class="message" role="status" hidden></p>
+    </section>
+    <footer>离线可用 · 数据仅保存在当前浏览器中</footer>
+  </main>
+  <dialog id="edit-dialog" aria-labelledby="edit-title">
+    <form id="edit-form">
+      <h2 id="edit-title">编辑任务</h2>
+      <label for="edit-input">任务内容</label>
+      <input id="edit-input" type="text" maxlength="500" required autocomplete="off">
+      <div class="dialog-actions">
+        <button id="cancel-edit" type="button">取消</button>
+        <button class="add" type="submit">保存</button>
+      </div>
+    </form>
+  </dialog>
+  <script>
+    'use strict';
+    const STORAGE_KEY = 'offline-todo-list-v1';
+    const form = document.getElementById('task-form');
+    const input = document.getElementById('task-input');
+    const list = document.getElementById('task-list');
+    const count = document.getElementById('count');
+    const empty = document.getElementById('empty');
+    const message = document.getElementById('message');
+    const filters = document.querySelectorAll('.filter');
+    let currentFilter = 'all';
+    let tasks = [];
+    const editDialog = document.getElementById('edit-dialog');
+    const editInput = document.getElementById('edit-input');
+    const undoBar = document.getElementById('undo-bar');
+    const backupStatus = document.getElementById('backup-status');
+    let editingTask = null;
+    let deletedTasks = [];
+
+    function showMessage(text) {
+      message.textContent = text;
+      message.hidden = !text;
+    }
+
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored !== null) {
+        const parsed = JSON.parse(stored);
+        if (!Array.isArray(parsed) || !parsed.every(task => task && typeof task.text === 'string' && typeof task.done === 'boolean')) {
+          throw new Error('Invalid saved tasks');
+        }
+        tasks = parsed.map(task => ({ text: task.text, done: task.done }));
+      }
+    } catch (error) {
+      showMessage('无法读取本地数据。可以继续使用，但请检查浏览器是否允许本地存储；原有数据未被主动清除。');
+    }
+
+    function save() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+        showMessage('');
+      } catch (error) {
+        showMessage('本次更改未能保存，刷新后可能丢失。请检查浏览器存储权限或可用空间。');
+      }
+    }
+
+    function render() {
+      list.replaceChildren();
+      tasks.forEach((task, index) => {
+        if (currentFilter === 'active' && task.done) return;
+        if (currentFilter === 'completed' && !task.done) return;
+        const item = document.createElement('li');
+        item.className = task.done ? 'task done' : 'task';
+        const label = document.createElement('label');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = task.done;
+        const text = document.createElement('span');
+        text.textContent = task.text;
+        checkbox.addEventListener('change', () => {
+          task.done = checkbox.checked;
+          item.classList.toggle('done', task.done);
+          save();
+          updateCount();
+          if (currentFilter !== 'all') {
+            render();
+            document.querySelector('.filter[aria-pressed="true"]').focus();
+          }
+        });
+        label.append(checkbox, text);
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'edit';
+        edit.textContent = '编辑';
+        edit.setAttribute('aria-label', '编辑任务：' + task.text);
+        edit.addEventListener('click', () => {
+          editingTask = task;
+          editInput.value = task.text;
+          editInput.setCustomValidity('');
+          editDialog.showModal();
+          editInput.focus();
+          editInput.select();
+        });
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'delete';
+        remove.textContent = '删除';
+        remove.setAttribute('aria-label', '删除任务：' + task.text);
+        remove.addEventListener('click', () => {
+          deletedTasks.push({ task, index });
+          tasks.splice(index, 1);
+          updateUndo();
+          save();
+          render();
+          const next = list.children[Math.min(index, list.children.length - 1)];
+          if (next) next.querySelector('.delete').focus();
+          else input.focus();
+        });
+        item.append(label, edit, remove);
+        list.append(item);
+      });
+      empty.hidden = list.children.length > 0;
+      const emptyMessages = {
+        all: ['清单还是空的', '添加第一件事，从这里开始。'],
+        active: ['没有未完成的任务', '歇一歇，或添加下一件想做的事。'],
+        completed: ['还没有已完成的任务', '完成一件事后，勾选它就会出现在这里。']
+      };
+      const [title, description] = emptyMessages[currentFilter];
+      const heading = document.createElement('b');
+      heading.textContent = title;
+      empty.replaceChildren(heading, description);
+      updateCount();
+    }
+
+    function updateCount() {
+      const remaining = tasks.filter(task => !task.done).length;
+      count.replaceChildren();
+      const number = document.createElement('strong');
+      number.textContent = remaining;
+      count.append('还有 ', number, ' 项未完成');
+    }
+
+    function updateUndo() {
+      undoBar.hidden = deletedTasks.length === 0;
+      document.getElementById('undo-text').textContent = '已删除任务，可依次撤销（刷新前有效）。';
+    }
+
+    document.getElementById('undo-button').addEventListener('click', () => {
+      const deleted = deletedTasks.pop();
+      if (!deleted) return;
+      tasks.splice(Math.min(deleted.index, tasks.length), 0, deleted.task);
+      save();
+      setFilter('all');
+      updateUndo();
+      if (undoBar.hidden) input.focus();
+    });
+
+    document.getElementById('cancel-edit').addEventListener('click', () => editDialog.close());
+    editDialog.addEventListener('close', () => { editingTask = null; });
+    editInput.addEventListener('input', () => editInput.setCustomValidity(''));
+    document.getElementById('edit-form').addEventListener('submit', event => {
+      event.preventDefault();
+      const text = editInput.value.trim();
+      if (!text) {
+        editInput.setCustomValidity('请输入任务内容，不能只输入空格。');
+        editInput.reportValidity();
+        return;
+      }
+      if (editingTask && tasks.includes(editingTask)) {
+        editingTask.text = text;
+        save();
+      }
+      editDialog.close();
+      render();
+      input.focus();
+    });
+
+    function reportBackup(text) {
+      backupStatus.textContent = text;
+      backupStatus.hidden = false;
+    }
+
+    document.getElementById('export-button').addEventListener('click', () => {
+      const backup = { version: 1, exportedAt: new Date().toISOString(), tasks };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = '待办清单备份-' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      reportBackup('已发起备份下载，请在浏览器下载记录中确认文件。');
+    });
+
+    const importFile = document.getElementById('import-file');
+    document.getElementById('import-button').addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', async () => {
+      const file = importFile.files[0];
+      if (!file) return;
+      try {
+        if (file.size > 5 * 1024 * 1024) throw new Error('文件不能超过 5 MB。');
+        const backup = JSON.parse(await file.text());
+        const incoming = Array.isArray(backup) ? backup : backup && backup.version === 1 ? backup.tasks : null;
+        if (!Array.isArray(incoming) || !incoming.every(task =>
+          task && typeof task.text === 'string' && task.text.trim().length > 0 &&
+          task.text.length <= 500 && typeof task.done === 'boolean'
+        )) throw new Error('备份格式无效，需要包含任务内容和完成状态。');
+        const known = new Set(tasks.map(task => JSON.stringify([task.text, task.done])));
+        const added = [];
+        incoming.forEach(task => {
+          const normalized = { text: task.text.trim(), done: task.done };
+          const key = JSON.stringify([normalized.text, normalized.done]);
+          if (!known.has(key)) {
+            known.add(key);
+            added.push(normalized);
+          }
+        });
+        tasks = tasks.concat(added);
+        save();
+        setFilter('all');
+        reportBackup('已导入 ' + added.length + ' 项任务，跳过 ' + (incoming.length - added.length) + ' 项重复任务。');
+      } catch (error) {
+        reportBackup('导入失败，现有任务未更改。' + (error instanceof SyntaxError ? '文件不是有效的 JSON。' : error.message));
+      } finally {
+        importFile.value = '';
+      }
+    });
+
+    function setFilter(value) {
+      currentFilter = value;
+      filters.forEach(button => {
+        button.setAttribute('aria-pressed', String(button.dataset.filter === value));
+      });
+      render();
+    }
+
+    filters.forEach(button => {
+      button.addEventListener('click', () => setFilter(button.dataset.filter));
+    });
+
+    input.addEventListener('input', () => input.setCustomValidity(''));
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      const text = input.value.trim();
+      if (!text) {
+        input.setCustomValidity('请输入任务内容，不能只输入空格。');
+        input.reportValidity();
+        return;
+      }
+      tasks.push({ text, done: false });
+      save();
+      setFilter(currentFilter === 'completed' ? 'active' : currentFilter);
+      input.value = '';
+      input.focus();
+    });
+
+    render();
+  </script>
+</body>
+</html>
